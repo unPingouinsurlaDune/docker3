@@ -1,0 +1,79 @@
+services:
+  caddy:
+    image: caddy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - directus
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: directus_psd
+      POSTGRES_USER: directus_psd
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    secrets:
+      - database_password
+    restart: unless-stopped
+
+  directus:
+    image: directus/directus:latest
+    environment:
+      KEY: directus
+      SECRET_FILE: /run/secrets/directus_secret
+      ADMIN_PASSWORD_FILE: /run/secrets/directus_admin_password
+      ADMIN_EMAIL_FILE: /run/secrets/directus_admin_mail
+      PUBLIC_URL: 'https://db.unpingouinsurladune.fr'
+      DB_CLIENT: pg
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: directus_psd
+      DB_USER: directus_psd
+      DB_PASSWORD_FILE: /run/secrets/database_password
+      CACHE_ENABLED: 'true'
+      CACHE_STORE: redis
+      REDIS: redis://cache:6379
+    ports:
+      - "8055:8055"
+    depends_on:
+      - db
+      - cache
+    secrets:
+      - directus_secret
+      - directus_admin_password
+      - database_password
+      - directus_admin_mail
+    restart: unless-stopped
+
+  cache:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
+  redis_data:
+
+
+secrets:
+  database_password:
+    file: ./secrets/database_password.txt
+  directus_secret:
+    file: ./secrets/directus_secret.txt
+  directus_admin_password:
+    file: ./secrets/directus_admin_password.txt
+  directus_admin_mail:
+    file: ./secrets/directus_admin_mail.txt
